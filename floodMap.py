@@ -104,9 +104,9 @@ class floodMap:
         self.climateFile = os.path.join(self.inputDir, 'climate.tif')
         self.climate = self.readData(self.climateFile).astype(np.uint8)
         self.watMask = self.readAccData(self.accFile).astype(np.bool)
-        self.handFile = os.path.join(self.resultsDir, "hand.tif")
-        self.floodAccFile = os.path.join(self.resultsDir, "floodAcc.tif")
-        self.floodStrahlerFile = os.path.join(self.resultsDir, "floodStrahler.tif")
+        self.handFile = os.path.join(self.outputDir, "hand.tif")
+        self.floodAccFile = os.path.join(self.outputDir, "floodAcc.tif")
+        self.floodStrahlerFile = os.path.join(self.outputDir, "floodStrahler.tif")
 
     def readData(self, fileName, saveInfo=False):
         fileHandle = gdal.Open(fileName)
@@ -204,8 +204,12 @@ class floodMap:
                     self.pixelCounter += 1
                     self.riverCellCounter += 1
 
+                    # Reset the river cell HAND height to 1 (neighborProcess may have overwritten it)
+                    self.hand[r, c] = 1
+
                     # Here going to set the "hand height" based on the climate zone and Strahler order of the river
-                    handHeight = self.chooseHandHeight(cl, r, c)
+                    orderIndex = self.orders.index(so)
+                    handHeight = self.chooseHandHeight(orderIndex, cl, r, c)
 
                     neighbors = self.neighborhood(r, c)
                     for idx, n in enumerate(neighbors):
@@ -282,11 +286,11 @@ class floodMap:
                         # all one value larger due to river cells having a value of 1)
                         if (relativeHeight + 1) <= hand:
                             self.hand[row, col] = relativeHeight + 1
-                            self.extrStrahler[row, col] = order
+                            self.floodStrahler[row, col] = order
                             if riverAcc < 0:
                                 print('DEBUG: riverAcc is a negative value')
                                 sys.exit(-1)
-                            self.extrAcc[row, col] = riverAcc
+                            self.floodAcc[row, col] = riverAcc
 
                     neighbors = self.neighborhood(row, col)
                     for index, n in enumerate(neighbors):
@@ -304,17 +308,6 @@ class floodMap:
                     if hand > 1 and (relativeHeight + 1) <= hand:
                         self.hand[row, col] = relativeHeight + 1
 
-                    neighbors = self.neighborhood(row, col)
-                    for index, n in enumerate(neighbors):
-                        if n is not None:
-                            pixel = (n[0], n[1], index)
-                            q.append(pixel)
-
-                # Keep hand as 1 if it is currently one
-                elif hand == 1:
-                    # Debug
-                    self.extrStrahler[row, col] = order
-                    self.extrAcc[row, col] = riverAcc
                     neighbors = self.neighborhood(row, col)
                     for index, n in enumerate(neighbors):
                         if n is not None:
@@ -341,7 +334,7 @@ class floodMap:
                                 pixel = (n[0], n[1], index)
                                 q.append(pixel)
 
-    def chooseHandHeight(self, climate, r, c):
+    def chooseHandHeight(self, orderIndex, climate, r, c):
         '''
         Return the HAND height for the given river cell based on its Strahler order and climate zone
         '''
@@ -350,10 +343,12 @@ class floodMap:
         # calculated based on the surrounding climate
         if climate == 0:
             neighboringClimate = self.neighboringClimate(r, c)
-            handHeight = self.climateHeights[neighboringClimate]
+            handHeightList = self.climateHeights[neighboringClimate]
+            handHeight = handHeightList[orderIndex]
             return handHeight
         else:
-            handHeight = self.climateHeights[climate]
+            handHeightList = self.climateHeights[climate]
+            handHeight = handHeightList[orderIndex]
             return handHeight
 
     def neighboringClimate(self, row, column):
@@ -469,16 +464,16 @@ class floodMap:
         print("HAND pixels= ", np.count_nonzero(self.hand))
 
         # Write text file with layer information
-        fLoc = os.path.join(self.resultsDir, "read_me.txt")
+        fLoc = os.path.join(self.outputDir, "read_me.txt")
         f = open(fLoc, "w+")
         f.write("Stream initiation upstream drainage area threshold: " + str(self.accThresh) + "\n")
         f.write("Strahler orders " + str(self.orders) + "\n")
-        f.write("Tropical (1) HAND heights " + str(self.HHeights1) + "\n")
-        f.write("Arid (2) HAND heights" + str(self.HHeights2) + "\n")
-        f.write("Semi-Arid (3) HAND heights" + str(self.HHeights3) + "\n")
-        f.write("Temperate (4) HAND heights" + str(self.HHeights4) + "\n")
-        f.write("Cold (5) HAND heights" + str(self.HHeights5) + "\n")
-        f.write("Polar (6) HAND heights" + str(self.HHEights6) + "\n")
+        f.write("Tropical (1) HAND heights " + str(self.climateHeights[1]) + "\n")
+        f.write("Arid (2) HAND heights" + str(self.climateHeights[2]) + "\n")
+        f.write("Semi-Arid (3) HAND heights" + str(self.climateHeights[3]) + "\n")
+        f.write("Temperate (4) HAND heights" + str(self.climateHeights[4]) + "\n")
+        f.write("Cold (5) HAND heights" + str(self.climateHeights[5]) + "\n")
+        f.write("Polar (6) HAND heights" + str(self.climateHeights[6]) + "\n")
         f.close()
 
         driver = gdal.GetDriverByName("GTiff")
@@ -539,9 +534,6 @@ if __name__ == "__main__":
         FM.mainProcess()
         FM.writeTifOutput()
     else:
-        print('hand.tif exists', H.handFile)
-
-    if options.verbose:
-        print(str(datetime.now()), "Done.")
+        print('hand.tif exists', FM.handFile)
 
 ################################################################################
