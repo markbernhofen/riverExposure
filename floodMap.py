@@ -296,9 +296,9 @@ class floodMap:
         Return the HAND height for the given river cell based on its Strahler order and climate zone
         '''
 
-        # If climate dataset shows 0 (which might be the case if there is not perfect overlap). The climate will be
-        # calculated based on the surrounding climate
-        if climate == 0:
+        # If climate dataset doesn't show a sensible number (which might be the case if there is not perfect overlap).
+        # The climate will be calculated based on the surrounding climate.
+        if not 1 <= climate <= 6:
             neighboringClimate = self.neighboringClimate(r, c)
             handHeightList = self.climateHeights[neighboringClimate]
             handHeight = handHeightList[orderIndex]
