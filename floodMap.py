@@ -11,9 +11,7 @@
 #   long as the "HAND" height of a smaller order doesn't exceed that of a larger order. The analysis is run for each
 #   Strahler stream order in turn and the final results are merged into the final output files. The influence of higher
 #   order streams takes precedence over smaller order streams. This is important at river confluences and for
-#   multi-channel rivers, where the largest (main) channel has the greatest effect on flooding. As similar order streams
-#   may have similar flooding potential, the influence of a larger order stream over a smaller order stream will only
-#   take effect if there is a difference of at least 2 Strahler stream orders between them
+#   multi-channel rivers, where the largest (main) channel has the greatest effect on flooding.
 #
 #   INPUTS
 #   built to use the following MERIT (Yamazaki) datasets:
@@ -71,7 +69,7 @@ class floodMap:
         self.climateHeights = {1: [1, 1, 2, 3, 5, 6, 7, 8, 10, 11, 12],
                                2: [1, 1, 1, 1, 2, 2, 3, 4, 7, 11, 11],
                                3: [1, 1, 1, 2, 3, 4, 5, 6, 7, 8, 10],
-                               4: [1, 1, 1, 3, 4, 5, 6, 7, 7, 8, 10],
+                               4: [1, 1, 2, 3, 3, 5, 0, 0, 0, 0, 0],
                                5: [1, 1, 1, 3, 4, 5, 6, 7, 7, 8, 10],
                                6: [1, 1, 1, 3, 4, 5, 6, 7, 7, 9, 10]}
 
@@ -175,10 +173,10 @@ class floodMap:
                     self.riverCellCounter += 1
 
 
-        # Going to work through the river network one Strahler order at a time, beginning at the maximum and finishing
-        # at 1.
+        # Going to work through the river network one Strahler order at a time, beginning at 1 and finishing at the
+        # maximum value.
         maxStrahler = int(np.amax(self.strahler))
-        for i in range (maxStrahler, 0, -1):
+        for i in range(1, maxStrahler + 1):
             currentOrder = i
             wpc = wph[wph['order']==currentOrder]
             # Sort the river cells based on height
@@ -269,70 +267,29 @@ class floodMap:
             # Does the neighboring cell drain into the current one?
             if dir == self.drainInToDirectionValues[index]:
 
-                # Going to keep current river's order and upstream accumulating area if existing stream is only one
-                # Strahler order larger.
-                if hand > 0 and self.floodStrahler[row, col] == order + 1:
-                    # Keep hand as 1 if it is already 1
-                    if hand == 1:
-                        self.floodStrahler[row, col] = order
-                        if riverAcc < 0:
-                            print('DEBUG: riverAcc is a negative value')
-                            sys.exit(-1)
-                        self.floodAcc[row, col] = riverAcc
+                neighborHeight = self.dem[row, col]
+                relativeHeight = int(neighborHeight - riverHeight)
+                if relativeHeight <= maxHeight:
+                    if relativeHeight < 0:
+                        self.hand[row, col] = 1
                     else:
-                        neighborHeight = self.dem[row, col]
-                        relativeHeight = int(neighborHeight - riverHeight)
-                        # if relative height is smaller or equal to existing hand height (+1 because hand heights are
-                        # all one value larger due to river cells having a value of 1)
-                        if (relativeHeight + 1) <= hand:
+                        # Want to ensure that the lowest HAND height is always taken as the final value
+                        if hand > 0 and (relativeHeight + 1) > hand:
+                            pass
+                        else:
                             self.hand[row, col] = relativeHeight + 1
-                            self.floodStrahler[row, col] = order
-                            if riverAcc < 0:
-                                print('DEBUG: riverAcc is a negative value')
-                                sys.exit(-1)
-                            self.floodAcc[row, col] = riverAcc
+                    self.floodStrahler[row, col] = order
+                    if riverAcc < 0:
+                        print('DEBUG: riverAcc is a negative value')
+                        sys.exit(-1)
+                    self.floodAcc[row, col] = riverAcc
+                    self.pixelCounter += 1
 
                     neighbors = self.neighborhood(row, col)
                     for index, n in enumerate(neighbors):
                         if n is not None:
                             pixel = (n[0], n[1], index)
                             q.append(pixel)
-
-                # Not going to overlap floodAcc and floodStrahler information if the existing stream is more than one
-                # Strahler stream order than the current stream. However, the hand heights will be adjusted to account
-                # for the existing (smaller stream).
-                elif hand > 0 and self.floodStrahler[row, col] > order+1:
-                    # Keep hand as 1 if it is already 1
-                    neighborHeight = self.dem[row, col]
-                    relativeHeight = int(neighborHeight - riverHeight)
-                    if hand > 1 and (relativeHeight + 1) <= hand:
-                        self.hand[row, col] = relativeHeight + 1
-
-                    neighbors = self.neighborhood(row, col)
-                    for index, n in enumerate(neighbors):
-                        if n is not None:
-                            pixel = (n[0], n[1], index)
-                            q.append(pixel)
-
-                # If the neighboring draining cell hasn't already been processed
-                else:
-                    neighborHeight = self.dem[row, col]
-                    relativeHeight = int(neighborHeight - riverHeight)
-                    if relativeHeight <= maxHeight:
-                        self.hand[row, col] = relativeHeight + 1
-                        self.floodStrahler[row, col] = order
-                        # Debug
-                        if riverAcc < 0:
-                            print('DEBUG: riverAcc is a negative value')
-                            sys.exit(-1)
-                        self.floodAcc[row, col] = riverAcc
-                        self.pixelCounter += 1
-
-                        neighbors = self.neighborhood(row, col)
-                        for index, n in enumerate(neighbors):
-                            if n is not None:
-                                pixel = (n[0], n[1], index)
-                                q.append(pixel)
 
     def chooseHandHeight(self, orderIndex, climate, r, c):
         '''
@@ -377,7 +334,6 @@ class floodMap:
             neighbors = self.multiNeighborhood(row, column, neighborhoodNum)
             for n in neighbors:
                 if n is not None:
-                    # Debug
                     r = n[0]
                     c = n[1]
                     climateVal = self.climate[r, c]
