@@ -66,12 +66,12 @@ class floodMap:
         # Here, set the Strahler order HAND heights for the different climate zones. Climate zone labels:
         # 1 = Tropical, 2 = Arid, 3 = Semi-Arid, 4 = Temperate, 5 = Cold, 6 = Polar
         self.orders = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
-        self.climateHeights = {1: [1, 1, 3, 5, 5, 7, 8, 8, 10, 11, 12],
-                               2: [0, 0, 1, 2, 2, 3, 3, 4, 8, 11, 11],
-                               3: [0, 0, 1, 2, 3, 4, 4, 4, 9, 9, 11],
-                               4: [1, 1, 2, 3, 3, 5, 7, 8, 9, 10, 10],
-                               5: [1, 1, 1, 3, 5, 6, 7, 7, 8, 9, 10],
-                               6: [1, 1, 1, 3, 5, 6, 7, 7, 8, 9, 10]}
+        self.climateHeights = {1: [1, 1, 3, 5, 7, 7, 8, 9, 10, 11, 12],
+                               2: [0, 0, 1, 2, 2, 3, 3, 4, 8, 10, 10],
+                               3: [0, 0, 1, 2, 3, 4, 4, 4, 9, 10, 10],
+                               4: [1, 1, 2, 3, 5, 6, 7, 8, 9, 10, 10],
+                               5: [1, 1, 1, 3, 5, 6, 7, 8, 9, 10, 10],
+                               6: [1, 1, 1, 3, 5, 6, 7, 8, 9, 10, 10]}
 
         self.inputDir = inputDir
         if not os.path.exists((self.inputDir)):
